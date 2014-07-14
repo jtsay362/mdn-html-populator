@@ -52,12 +52,32 @@ class HtmlTagPopulator
       },
       "properties" : {
         "name" : {
-          "type" : string",
+          "type" : "string",
           "index" : "not_analyzed"
         },
         "summary" : {
-          "type" : string",
-          "index" : "analyzed"
+          "type" : "string",
+          "index" : "no"
+        },
+        "html5Only" : {
+          "type" : "boolean",
+          "index" : "no"
+        },
+        "attributes" : {
+          "properties" : {
+            "name" : {
+              "type" : "string",
+              "index" : "not_analyzed"
+            },
+            "summary" : {
+              "type" : "string",
+              "index" : "no"
+            },
+            "html5Only" : {
+              "type" : "boolean",
+              "index" : "no"
+            }
+          }
         }
       }
     }
@@ -96,9 +116,21 @@ class HtmlTagPopulator
         puts "Can't find summary header for tag <#{tag_name}>!"
       end
 
-      doc = {
+      attributes = parse_attributes(doc, tag_name)
+
+      overhead_indicator = doc.css('.overheadIndicator.htmlVer').first
+
+      html5_only = false
+
+      if overhead_indicator && /Introduced[[:space:]]+in[[:space:]]+HTML5/i.match(overhead_indicator.text)
+        html5_only = true
+      end
+
+      output_doc = {
         name: tag_name,
-        summary: summary
+        summary: summary,
+        attributes: attributes,
+        html5Only: html5_only
       }
 
       if @first_document
@@ -107,13 +139,67 @@ class HtmlTagPopulator
         out.write(",\n")
       end
 
-      json_doc = doc.to_json
+      json_doc = output_doc.to_json
       out.write(json_doc)
     end
 
     puts "Done parsing file for tag <#{tag_name}>."
   end
 
+  def parse_attributes(doc, tag_name)
+    attributes_header = doc.css('#Attributes').first
+
+    unless attributes_header
+      puts "Can't find attributes header for <#{tag_name}>!"
+      return []
+    end
+
+    element = attributes_header
+
+    until element.nil? || (element.name == 'dl')
+      element = element.next_element
+    end
+
+    unless element
+      puts "Can't find <dl> after attributes header!"
+      return []
+    end
+
+    attributes = []
+    element.css('>dt').each do |dt|
+      puts "Got dt for <#{tag_name}>"
+
+      attribute_name_element = dt.css('strong').first
+
+      unless attribute_name_element
+        puts "No attribute name found"
+        next
+      end
+
+      name = attribute_name_element.text().strip
+
+      puts "Found attribute named #{name} for <#{tag_name}>."
+
+      dd = dt.next_element
+      summary = dd.text().strip
+
+      html5_only = false
+
+      htmlVersionIndicator = dt.css('.htmlVer').first
+
+      if htmlVersionIndicator && (htmlVersionIndicator.text().strip.downcase == 'html5')
+        html5_only = true
+      end
+
+      attributes <<  {
+        name: name,
+        summary: summary,
+        html5Only: html5_only
+      }
+    end
+
+    attributes
+  end
 end
 
 output_filename = 'html_tags.json'
