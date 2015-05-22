@@ -19,19 +19,22 @@ class HtmlTagPopulator
     agent = Mechanize.new
     page = agent.get("#{BASE_URL}")
 
-    page.search('.index li a').each do |a|
+    page.search('#quick-links ol > li ol > li a').each do |a|
       tag_name = a.text().strip
       # Strip <>
-      tag_name = tag_name.slice(1, tag_name.length - 2)
+      if tag_name.start_with?('<') && tag_name.end_with?('>')
+        tag_name = tag_name.slice(1, tag_name.length - 2)
 
-      puts "Downloading page for <#{tag_name}> ..."
-      uri = URI.parse("#{BASE_URL}/#{tag_name}")
-      response = Net::HTTP.get_response(uri)
+        puts "Downloading page for <#{tag_name}> ..."
+        uri = URI.parse("#{BASE_URL}/#{tag_name}")
+        response = Net::HTTP.get_response(uri)
 
-      puts "Done downloading page for <#{tag_name}>, sleeping ..."
-      sleep(1)
+        puts "Done downloading page for <#{tag_name}>, sleeping ..."
+        sleep(1)
 
-      File.write("#{DOWNLOAD_DIR}/#{tag_name}.html", response.body)
+
+        File.write("#{DOWNLOAD_DIR}/#{tag_name}.html", response.body)
+      end
     end
 
     puts "Done downloading!"
@@ -55,7 +58,7 @@ class HtmlTagPopulator
           "type" : "string",
           "index" : "not_analyzed"
         },
-        "summary" : {
+        "summaryHtml" : {
           "type" : "string",
           "index" : "no"
         },
@@ -69,7 +72,7 @@ class HtmlTagPopulator
               "type" : "string",
               "index" : "not_analyzed"
             },
-            "summary" : {
+            "summaryHtml" : {
               "type" : "string",
               "index" : "no"
             },
@@ -108,12 +111,31 @@ class HtmlTagPopulator
     File.open(file_path) do |f|
       doc = Nokogiri::HTML(f)
 
-      summary = nil
+      summary_html = nil
       summary_header = doc.css('#Summary').first
       if summary_header
-        summary = summary_header.next_element().text()
+        summary_html = summary_header.next_element().inner_html()
       else
-        puts "Can't find summary header for tag <#{tag_name}>!"
+        article = doc.css('#wikiArticle').first
+
+
+
+        if article
+          summary_html = ''
+          article.element_children.each do |child|
+            if child.name == 'p'
+              summary_html += child.to_html()
+            end
+          end
+        else
+          puts "Can't find summary for tag <#{tag_name}>!"
+        end
+      end
+
+      summary_html = summary_html.strip
+
+      if summary_html.empty?
+        puts "Empty summary for <#{tag_name}>!"
       end
 
       attributes = parse_attributes(doc, tag_name)
@@ -128,7 +150,7 @@ class HtmlTagPopulator
 
       output_doc = {
         name: tag_name,
-        summary: summary,
+        summaryHtml: summary_html,
         attributes: attributes,
         html5Only: html5_only
       }
@@ -181,7 +203,7 @@ class HtmlTagPopulator
       puts "Found attribute named #{name} for <#{tag_name}>."
 
       dd = dt.next_element
-      summary = dd.text().strip
+      summary_html = dd.inner_html().strip
 
       html5_only = false
 
@@ -193,7 +215,7 @@ class HtmlTagPopulator
 
       attributes <<  {
         name: name,
-        summary: summary,
+        summaryHtml: summary_html,
         html5Only: html5_only
       }
     end
