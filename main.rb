@@ -118,8 +118,6 @@ class HtmlTagPopulator
       else
         article = doc.css('#wikiArticle').first
 
-
-
         if article
           summary_html = ''
           article.element_children.each do |child|
@@ -132,7 +130,7 @@ class HtmlTagPopulator
         end
       end
 
-      summary_html = summary_html.strip
+      summary_html = (summary_html || '').strip
 
       if summary_html.empty?
         puts "Empty summary for <#{tag_name}>!"
