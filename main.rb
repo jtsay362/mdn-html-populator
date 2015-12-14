@@ -81,6 +81,9 @@ class HtmlTagPopulator
               "index" : "no"
             }
           }
+        },
+        "suggest" : {
+          "type" : "completion"
         }
       }
     }
@@ -150,7 +153,8 @@ class HtmlTagPopulator
         name: tag_name,
         summaryHtml: summary_html,
         attributes: attributes,
-        html5Only: html5_only
+        html5Only: html5_only,
+        suggest: tag_name
       }
 
       if @first_document
